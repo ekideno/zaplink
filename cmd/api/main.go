@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,15 +11,26 @@ import (
 
 	"github.com/ekideno/zaplink/internal/config"
 	apphttp "github.com/ekideno/zaplink/internal/http"
+	"github.com/ekideno/zaplink/internal/logger"
 )
 
 func main() {
+	log := logger.NewDefault()
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		log.Error("failed to load config",
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
 	}
 
-	r := apphttp.NewRouter()
+	log = logger.New(logger.Config{
+		Env:      cfg.ENV,
+		LogFile:  cfg.LogFile,
+		LogLevel: cfg.LogLevel,
+	})
+	r := apphttp.NewRouter(log)
 	server := &http.Server{
 		Addr:    ":" + cfg.HTTPPort,
 		Handler: r,
@@ -29,21 +40,29 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Server started on :%s", cfg.HTTPPort)
+		log.Info("server started",
+			slog.String("port", cfg.HTTPPort),
+		)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Error("failed to start server",
+				slog.String("error", err.Error()),
+			)
+			os.Exit(1)
 		}
 	}()
 
 	<-stop
-	log.Println("Shutting down server...")
+	log.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatal("Shutdown error:", err)
+		log.Error("failed to Shutdown server",
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
 	}
 
-	log.Println("Server stopped gracefully")
+	log.Info("Server stopped gracefully")
 }
