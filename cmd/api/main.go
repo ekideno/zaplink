@@ -9,14 +9,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ekideno/zaplink/internal/config"
 	apphttp "github.com/ekideno/zaplink/internal/http"
 )
 
 func main() {
-	r := apphttp.NewRouter()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
 
+	r := apphttp.NewRouter()
 	server := &http.Server{
-		Addr:    ":1123",
+		Addr:    ":" + cfg.HTTPPort,
 		Handler: r,
 	}
 
@@ -24,7 +29,7 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Println("Server started on :8080")
+		log.Printf("Server started on :%s", cfg.HTTPPort)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
