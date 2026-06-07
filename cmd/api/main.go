@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ekideno/zaplink/internal/config"
+	"github.com/ekideno/zaplink/internal/db"
 	apphttp "github.com/ekideno/zaplink/internal/http"
 	"github.com/ekideno/zaplink/internal/logger"
 )
@@ -25,10 +26,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	pool := db.NewPostgresPool(cfg.DB.URL)
+	defer pool.Close()
+
 	log = logger.New(logger.Config{
 		Env:      cfg.ENV,
-		LogFile:  cfg.LogFile,
-		LogLevel: cfg.LogLevel,
+		LogFile:  cfg.Log.File,
+		LogLevel: cfg.Log.Level,
 	})
 	r := apphttp.NewRouter(log)
 	server := &http.Server{

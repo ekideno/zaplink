@@ -2,62 +2,78 @@ package config
 
 import (
 	"errors"
-	"fmt"
-	"log"
-	"os"
-
 	"log/slog"
+	"os"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
 	HTTPPort string
-	DBURL    string
+	ENV      string
 
-	ENV string
+	DB DatabaseConfig
 
-	LogLevel slog.Level
-	LogFile  string
+	Log LogConfig
+}
+
+type DatabaseConfig struct {
+	URL string
+}
+
+type LogConfig struct {
+	Level slog.Level
+	File  string
 }
 
 func Load() (Config, error) {
-	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Printf("warn: could not load .env file: %v", err)
+	_ = godotenv.Load()
+
+	cfg := Config{
+		HTTPPort: getEnv("HTTP_PORT", "8080"),
+		ENV:      getEnv("ENV", "dev"),
+
+		DB: DatabaseConfig{
+			URL: getEnv("DATABASE_URL", ""),
+		},
+
+		Log: LogConfig{
+			Level: parseLogLevel(getEnv("LOG_LEVEL", "info")),
+			File:  getEnv("LOG_FILE", "./logs/app.log"),
+		},
 	}
 
-	port := os.Getenv("HTTP_PORT")
-	if port == "" {
-		port = "8080"
+	if err := cfg.validate(); err != nil {
+		return Config{}, err
 	}
 
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required but not set")
+	return cfg, nil
+}
+
+func MustLoad() Config {
+	cfg, err := Load()
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+func (c Config) validate() error {
+	if c.DB.URL == "" {
+		return errors.New("DATABASE_URL is required")
 	}
 
-	env := os.Getenv("ENV")
-	if env == "" {
-		env = "dev"
+	if c.HTTPPort == "" {
+		return errors.New("HTTP_PORT is empty")
 	}
 
-	logLevelStr := os.Getenv("LOG_LEVEL")
-	if logLevelStr == "" {
-		logLevelStr = "info"
+	return nil
+}
+func getEnv(key, fallback string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
 	}
-
-	logFile := os.Getenv("LOG_FILE")
-	if logFile == "" {
-		logFile = "./logs/app.log"
-	}
-
-	return Config{
-		HTTPPort: port,
-		DBURL:    dbURL,
-		ENV:      env,
-		LogLevel: parseLogLevel(logLevelStr),
-		LogFile:  logFile,
-	}, nil
+	return val
 }
 
 func parseLogLevel(level string) slog.Level {
