@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,18 +17,19 @@ import (
 	"github.com/ekideno/zaplink/internal/logger"
 )
 
+const shutdownTimeout = 5 * time.Second
+
 func main() {
-	os.Exit(run())
+	if err := run(); err != nil {
+		slog.Error("fatal", slog.Any("error", err))
+		os.Exit(1)
+	}
 }
 
-func run() int {
-	log := logger.NewDefault()
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Error("failed to load config",
-			slog.String("error", err.Error()),
-		)
-		return 1
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	log, closeLog, err := logger.New(logger.Config{
@@ -35,69 +38,58 @@ func run() int {
 		LogLevel: cfg.Log.Level,
 	})
 	if err != nil {
-		log.Error("failed to initialize logger",
-			slog.String("error", err.Error()),
-		)
-		return 1
+		return fmt.Errorf("init logger: %w", err)
 	}
 	defer func() {
 		if err := closeLog(); err != nil {
-			log.Error("failed to close logger",
-				slog.String("error", err.Error()),
-			)
+			log.Error("close logger", slog.Any("error", err))
 		}
 	}()
 
-	database, err := db.NewPostgres(context.Background(), cfg.DB.URL)
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer connectCancel()
+
+	database, err := db.NewPostgres(connectCtx, cfg.DB.URL)
 	if err != nil {
-		log.Error("failed to initialize database",
-			slog.String("error", err.Error()),
-		)
-		return 1
+		return fmt.Errorf("init database: %w", err)
 	}
 	defer database.Close()
 
-	r := apphttp.NewRouter(log)
-	server := &http.Server{
-		Addr:    ":" + cfg.HTTPPort,
-		Handler: r,
+	srv := &http.Server{
+		Addr:         ":" + cfg.HTTPPort,
+		Handler:      apphttp.NewRouter(log),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(stop)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Info("server started",
-			slog.String("port", cfg.HTTPPort),
-		)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Info("server started", slog.String("addr", srv.Addr))
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
 	}()
 
 	select {
 	case err := <-serverErr:
-		log.Error("failed to start server",
-			slog.String("error", err.Error()),
-		)
-		return 1
-	case <-stop:
+		return fmt.Errorf("server: %w", err)
+	case <-ctx.Done():
+		stop()
 	}
 
-	log.Info("Shutting down server...")
+	log.Info("shutting down")
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Error("failed to shutdown server",
-			slog.String("error", err.Error()),
-		)
-		return 1
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("shutdown: %w", err)
 	}
 
-	log.Info("Server stopped gracefully")
-	return 0
+	log.Info("stopped gracefully")
+	return nil
 }
