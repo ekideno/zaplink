@@ -2,6 +2,8 @@ package logger
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -21,10 +23,10 @@ func NewDefault() *slog.Logger {
 	)
 }
 
-func New(cfg Config) *slog.Logger {
+func New(cfg Config) (*slog.Logger, func() error, error) {
 	err := os.MkdirAll(filepath.Dir(cfg.LogFile), 0755)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("create log directory: %w", err)
 	}
 
 	file, err := os.OpenFile(
@@ -33,7 +35,7 @@ func New(cfg Config) *slog.Logger {
 		0644,
 	)
 	if err != nil {
-		panic(err)
+		return nil, nil, fmt.Errorf("open log file: %w", err)
 	}
 
 	var handler slog.Handler
@@ -66,7 +68,7 @@ func New(cfg Config) *slog.Logger {
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 
-	return logger
+	return logger, file.Close, nil
 }
 
 type multiHandler struct {
@@ -87,10 +89,13 @@ func (h *multiHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *multiHandler) Handle(ctx context.Context, r slog.Record) error {
+	var errs []error
 	for _, handler := range h.handlers {
-		_ = handler.Handle(ctx, r)
+		if err := handler.Handle(ctx, r); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (h *multiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {

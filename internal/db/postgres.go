@@ -2,20 +2,21 @@ package db
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewPostgresPool(dsn string) *pgxpool.Pool {
+func NewPostgresPool(dsn string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		log.Fatalf("db connect error: %v", err)
+		return nil, fmt.Errorf("connect to postgres: %w", err)
 	}
 
 	if err := pool.Ping(context.Background()); err != nil {
-		log.Fatalf("db ping error: %v", err)
+		pool.Close()
+		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
-	return pool
+	return pool, nil
 }

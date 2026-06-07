@@ -16,6 +16,10 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	log := logger.NewDefault()
 
 	cfg, err := config.Load()
@@ -23,17 +27,37 @@ func main() {
 		log.Error("failed to load config",
 			slog.String("error", err.Error()),
 		)
-		os.Exit(1)
+		return 1
 	}
 
-	pool := db.NewPostgresPool(cfg.DB.URL)
-	defer pool.Close()
-
-	log = logger.New(logger.Config{
+	log, closeLog, err := logger.New(logger.Config{
 		Env:      cfg.ENV,
 		LogFile:  cfg.Log.File,
 		LogLevel: cfg.Log.Level,
 	})
+	if err != nil {
+		log.Error("failed to initialize logger",
+			slog.String("error", err.Error()),
+		)
+		return 1
+	}
+	defer func() {
+		if err := closeLog(); err != nil {
+			log.Error("failed to close logger",
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
+
+	pool, err := db.NewPostgresPool(cfg.DB.URL)
+	if err != nil {
+		log.Error("failed to initialize database",
+			slog.String("error", err.Error()),
+		)
+		return 1
+	}
+	defer pool.Close()
+
 	r := apphttp.NewRouter(log)
 	server := &http.Server{
 		Addr:    ":" + cfg.HTTPPort,
@@ -43,19 +67,25 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Info("server started",
 			slog.String("port", cfg.HTTPPort),
 		)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("failed to start server",
-				slog.String("error", err.Error()),
-			)
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
-	<-stop
+	select {
+	case err := <-serverErr:
+		log.Error("failed to start server",
+			slog.String("error", err.Error()),
+		)
+		return 1
+	case <-stop:
+	}
+
 	log.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -65,8 +95,9 @@ func main() {
 		log.Error("failed to Shutdown server",
 			slog.String("error", err.Error()),
 		)
-		os.Exit(1)
+		return 1
 	}
 
 	log.Info("Server stopped gracefully")
+	return 0
 }
