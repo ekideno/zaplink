@@ -21,7 +21,6 @@ func main() {
 
 func run() int {
 	log := logger.NewDefault()
-
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error("failed to load config",
@@ -49,14 +48,14 @@ func run() int {
 		}
 	}()
 
-	pool, err := db.NewPostgresPool(cfg.DB.URL)
+	database, err := db.NewPostgres(context.Background(), cfg.DB.URL)
 	if err != nil {
 		log.Error("failed to initialize database",
 			slog.String("error", err.Error()),
 		)
 		return 1
 	}
-	defer pool.Close()
+	defer database.Close()
 
 	r := apphttp.NewRouter(log)
 	server := &http.Server{
@@ -66,6 +65,7 @@ func run() int {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(stop)
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -88,11 +88,11 @@ func run() int {
 
 	log.Info("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
 
-	if err := server.Shutdown(ctx); err != nil {
-		log.Error("failed to Shutdown server",
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Error("failed to shutdown server",
 			slog.String("error", err.Error()),
 		)
 		return 1
