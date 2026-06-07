@@ -79,10 +79,11 @@ Handler → Service → Repository → Database / Cache
 
 Stores shortened URLs.
 
-- id (UUID / serial)
-- original_url (text)
-- short_code (unique string)
-- created_at (timestamp)
+- id (BIGINT identity primary key)
+- short_code (VARCHAR(8), unique)
+- original_url (TEXT)
+- is_active (BOOLEAN, default true)
+- created_at (TIMESTAMPTZ, default now())
 
 ---
 
@@ -90,11 +91,11 @@ Stores shortened URLs.
 
 Stores analytics for each redirect.
 
-- id
-- link_id (foreign key)
-- timestamp
-- user_agent
-- ip_address (optional)
+- id (BIGINT identity primary key)
+- link_id (foreign key to `links.id`, cascade on delete)
+- created_at (TIMESTAMPTZ, default now())
+- user_agent (TEXT, optional)
+- ip_address (INET, optional)
 
 ---
 
@@ -104,4 +105,4 @@ Stores analytics for each redirect.
 - PostgreSQL (persistent storage)
 - Redis (caching layer)
 - Docker / Docker Compose
-- golang-migrate (database migrations)
+- golang-migrate-compatible SQL migrations in `migrations/`
