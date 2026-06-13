@@ -63,7 +63,7 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 	}
 
 	if !link.IsActive {
-		return nil, errors.New("link is inactive")
+		return nil, ErrInactiveLink
 	}
 
 	return link, nil
