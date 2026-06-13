@@ -8,10 +8,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/ekideno/zaplink/internal/http/handler"
 	appmiddleware "github.com/ekideno/zaplink/internal/middleware"
 )
 
-func NewRouter(log *slog.Logger) http.Handler {
+func NewRouter(log *slog.Logger, linkHandler *handler.LinkHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -23,6 +24,8 @@ func NewRouter(log *slog.Logger) http.Handler {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
+
+	r.Post("/links", linkHandler.CreateLink)
 
 	return r
 }

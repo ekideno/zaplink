@@ -14,7 +14,10 @@ import (
 	"github.com/ekideno/zaplink/internal/config"
 	"github.com/ekideno/zaplink/internal/db"
 	apphttp "github.com/ekideno/zaplink/internal/http"
+	"github.com/ekideno/zaplink/internal/http/handler"
 	"github.com/ekideno/zaplink/internal/logger"
+	"github.com/ekideno/zaplink/internal/repository"
+	"github.com/ekideno/zaplink/internal/service"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -55,9 +58,13 @@ func run() error {
 	}
 	defer database.Close()
 
+	linkRepo := repository.NewLinkPostgres(database)
+	linkService := service.NewLinkService(linkRepo)
+	linkHandler := handler.NewLinkHandler(linkService, log)
+
 	srv := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
-		Handler:      apphttp.NewRouter(log),
+		Handler:      apphttp.NewRouter(log, linkHandler),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

@@ -41,7 +41,7 @@ func (r *LinkPostgresRepository) GetLinkByID(ctx context.Context, id int64) (*mo
 		Scan(&link.ID, &link.ShortCode, &link.OriginalURL, &link.IsActive, &link.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get link by id: %w", err)
 	}
@@ -61,7 +61,7 @@ func (r *LinkPostgresRepository) GetLinkByShortCode(ctx context.Context, shortCo
 		Scan(&link.ID, &link.ShortCode, &link.OriginalURL, &link.IsActive, &link.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get link by short code: %w", err)
 	}

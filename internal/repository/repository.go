@@ -2,9 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ekideno/zaplink/internal/model"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type LinkRepository interface {
 	CreateLink(ctx context.Context, link *model.Link) error
