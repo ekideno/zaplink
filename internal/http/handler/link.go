@@ -1,13 +1,20 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 
+	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/service"
 )
+
+type LinkService interface {
+	CreateLink(ctx context.Context, url string) (*model.Link, error)
+	GetByShortCode(ctx context.Context, shortCode string) (*model.Link, error)
+}
 
 type createLinkRequest struct {
 	URL string `json:"url"`
@@ -19,11 +26,11 @@ type createLinkResponse struct {
 }
 
 type LinkHandler struct {
-	service *service.LinkService
+	service LinkService
 	log     *slog.Logger
 }
 
-func NewLinkHandler(svc *service.LinkService, log *slog.Logger) *LinkHandler {
+func NewLinkHandler(svc LinkService, log *slog.Logger) *LinkHandler {
 	return &LinkHandler{service: svc, log: log}
 }
 
