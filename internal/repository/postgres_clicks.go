@@ -4,8 +4,17 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ekideno/zaplink/internal/db"
 	"github.com/ekideno/zaplink/internal/model"
 )
+
+type ClickPostgresRepository struct {
+	db *db.DB
+}
+
+func NewClickPostgres(database *db.DB) *ClickPostgresRepository {
+	return &ClickPostgresRepository{db: database}
+}
 
 func (r *ClickPostgresRepository) CreateClick(ctx context.Context, click *model.Click) error {
 	const query = `

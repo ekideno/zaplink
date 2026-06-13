@@ -5,9 +5,18 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ekideno/zaplink/internal/db"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/jackc/pgx/v5"
 )
+
+type LinkPostgresRepository struct {
+	db *db.DB
+}
+
+func NewLinkPostgres(database *db.DB) *LinkPostgresRepository {
+	return &LinkPostgresRepository{db: database}
+}
 
 func (r *LinkPostgresRepository) CreateLink(ctx context.Context, link *model.Link) error {
 	const query = `
