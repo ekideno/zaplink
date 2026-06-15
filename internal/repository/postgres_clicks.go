@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/ekideno/zaplink/internal/db"
 	"github.com/ekideno/zaplink/internal/model"
@@ -39,4 +40,19 @@ func (r *ClickPostgresRepository) CreateClick(ctx context.Context, click *model.
 	}
 
 	return nil
+}
+
+func (r *ClickPostgresRepository) CountClicksByLinkID(ctx context.Context, linkID int64) (int64, error) {
+	const query = `
+		SELECT COUNT(*)
+		FROM clicks
+		WHERE link_id = $1
+	`
+
+	var count int64
+	if err := r.db.Pool.QueryRow(ctx, query, linkID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count clicks by link id: %w", err)
+	}
+
+	return count, nil
 }

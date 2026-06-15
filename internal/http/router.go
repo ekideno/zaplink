@@ -26,6 +26,7 @@ func NewRouter(log *slog.Logger, linkHandler *handler.LinkHandler) http.Handler 
 	})
 
 	r.Post("/links", linkHandler.CreateLink)
+	r.Get("/links/{short_code}", linkHandler.GetInfo)
 	r.Get("/{short_code}", linkHandler.Redirect)
 
 	return r

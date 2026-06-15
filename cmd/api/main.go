@@ -59,7 +59,8 @@ func run() error {
 	defer database.Close()
 
 	linkRepo := repository.NewLinkPostgres(database)
-	linkService := service.NewLinkService(linkRepo)
+	clickRepo := repository.NewClickPostgres(database)
+	linkService := service.NewLinkService(linkRepo, clickRepo)
 	linkHandler := handler.NewLinkHandler(linkService, log)
 
 	srv := &http.Server{

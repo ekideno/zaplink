@@ -18,4 +18,5 @@ type LinkRepository interface {
 
 type ClickRepository interface {
 	CreateClick(ctx context.Context, click *model.Click) error
+	CountClicksByLinkID(ctx context.Context, linkID int64) (int64, error)
 }

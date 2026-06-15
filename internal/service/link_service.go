@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 
 	"github.com/ekideno/zaplink/internal/model"
@@ -13,12 +14,18 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type LinkService struct {
-	repo repository.LinkRepository
+type LinkInfo struct {
+	Link        *model.Link
+	ClicksCount  int64
 }
 
-func NewLinkService(repo repository.LinkRepository) *LinkService {
-	return &LinkService{repo: repo}
+type LinkService struct {
+	links  repository.LinkRepository
+	clicks repository.ClickRepository
+}
+
+func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepository) *LinkService {
+	return &LinkService{links: links, clicks: clicks}
 }
 
 func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*model.Link, error) {
@@ -40,7 +47,7 @@ func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*mode
 			IsActive:    true,
 		}
 
-		if err := s.repo.CreateLink(ctx, link); err != nil {
+		if err := s.links.CreateLink(ctx, link); err != nil {
 			if isUniqueViolation(err) {
 				continue
 			}
@@ -54,7 +61,7 @@ func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*mode
 }
 
 func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*model.Link, error) {
-	link, err := s.repo.GetLinkByShortCode(ctx, shortCode)
+	link, err := s.links.GetLinkByShortCode(ctx, shortCode)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, repository.ErrNotFound
@@ -67,6 +74,49 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 	}
 
 	return link, nil
+}
+
+func (s *LinkService) GetLinkInfo(ctx context.Context, shortCode string) (*LinkInfo, error) {
+	link, err := s.GetByShortCode(ctx, shortCode)
+	if err != nil {
+		return nil, err
+	}
+
+	clicksCount, err := s.clicks.CountClicksByLinkID(ctx, link.ID)
+	if err != nil {
+		return nil, fmt.Errorf("count clicks: %w", err)
+	}
+
+	return &LinkInfo{
+		Link:       link,
+		ClicksCount: clicksCount,
+	}, nil
+}
+
+func (s *LinkService) TrackClick(ctx context.Context, linkID int64, userAgent, remoteAddr string) error {
+	var ipAddress *string
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		ipAddress = &host
+	} else if remoteAddr != "" {
+		ipAddress = &remoteAddr
+	}
+
+	var ua *string
+	if userAgent != "" {
+		ua = &userAgent
+	}
+
+	click := &model.Click{
+		LinkID:    linkID,
+		UserAgent: ua,
+		IPAddress: ipAddress,
+	}
+
+	if err := s.clicks.CreateClick(ctx, click); err != nil {
+		return fmt.Errorf("create click: %w", err)
+	}
+
+	return nil
 }
 
 func generateShortCode(n int) (string, error) {
