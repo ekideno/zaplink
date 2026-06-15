@@ -1,4 +1,3 @@
-// internal/service/link_test.go
 package service_test
 
 import (
@@ -19,7 +18,7 @@ func TestCreateLink_Success(t *testing.T) {
 	}
 	clicks := &mockClickRepo{}
 
-	svc := service.NewLinkService(repo, clicks)
+	svc := service.NewLinkService(repo, clicks, nil, 0)
 	link, err := svc.CreateLink(context.Background(), "https://google.com")
 
 	if err != nil {
@@ -31,7 +30,7 @@ func TestCreateLink_Success(t *testing.T) {
 }
 
 func TestCreateLink_InvalidURL(t *testing.T) {
-	svc := service.NewLinkService(&mockLinkRepo{}, &mockClickRepo{})
+	svc := service.NewLinkService(&mockLinkRepo{}, &mockClickRepo{}, nil, 0)
 
 	_, err := svc.CreateLink(context.Background(), "not-a-url")
 	if !errors.Is(err, service.ErrInvalidURL) {
@@ -47,7 +46,7 @@ func TestGetByShortCode_NotFound(t *testing.T) {
 	}
 	clicks := &mockClickRepo{}
 
-	svc := service.NewLinkService(repo, clicks)
+	svc := service.NewLinkService(repo, clicks, nil, 0)
 	_, err := svc.GetByShortCode(context.Background(), "abc123")
 
 	if !errors.Is(err, repository.ErrNotFound) {
@@ -63,7 +62,7 @@ func TestGetByShortCode_Inactive(t *testing.T) {
 	}
 	clicks := &mockClickRepo{}
 
-	svc := service.NewLinkService(repo, clicks)
+	svc := service.NewLinkService(repo, clicks, nil, 0)
 	_, err := svc.GetByShortCode(context.Background(), "abc123")
 
 	if !errors.Is(err, service.ErrInactiveLink) {

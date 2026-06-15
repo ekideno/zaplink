@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ekideno/zaplink/internal/cache"
 	"github.com/ekideno/zaplink/internal/config"
 	"github.com/ekideno/zaplink/internal/db"
 	apphttp "github.com/ekideno/zaplink/internal/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/ekideno/zaplink/internal/logger"
 	"github.com/ekideno/zaplink/internal/repository"
 	"github.com/ekideno/zaplink/internal/service"
+	"github.com/redis/go-redis/v9"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -58,9 +60,25 @@ func run() error {
 	}
 	defer database.Close()
 
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+	if err := redisClient.Ping(connectCtx).Err(); err != nil {
+		_ = redisClient.Close()
+		return fmt.Errorf("ping redis: %w", err)
+	}
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			log.Error("close redis", slog.Any("error", err))
+		}
+	}()
+
 	linkRepo := repository.NewLinkPostgres(database)
 	clickRepo := repository.NewClickPostgres(database)
-	linkService := service.NewLinkService(linkRepo, clickRepo)
+	linkCache := cache.NewRedisCache(redisClient)
+	linkService := service.NewLinkService(linkRepo, clickRepo, linkCache, cfg.Redis.TTL)
 	linkHandler := handler.NewLinkHandler(linkService, log)
 
 	srv := &http.Server{

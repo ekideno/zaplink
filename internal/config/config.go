@@ -2,8 +2,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -12,13 +14,21 @@ type Config struct {
 	HTTPPort string
 	ENV      string
 
-	DB DatabaseConfig
+	DB    DatabaseConfig
+	Redis RedisConfig
 
 	Log LogConfig
 }
 
 type DatabaseConfig struct {
 	URL string
+}
+
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
+	TTL      time.Duration
 }
 
 type LogConfig struct {
@@ -35,6 +45,12 @@ func Load() (Config, error) {
 
 		DB: DatabaseConfig{
 			URL: getEnv("DATABASE_URL", ""),
+		},
+		Redis: RedisConfig{
+			Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getEnvInt("REDIS_DB", 0),
+			TTL:      time.Duration(getEnvInt("REDIS_TTL_SECONDS", 3600)) * time.Second,
 		},
 
 		Log: LogConfig{
@@ -66,6 +82,10 @@ func (c Config) validate() error {
 		return errors.New("HTTP_PORT is empty")
 	}
 
+	if c.Redis.Addr == "" {
+		return errors.New("REDIS_ADDR is empty")
+	}
+
 	return nil
 }
 func getEnv(key, fallback string) string {
@@ -74,6 +94,20 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return val
+}
+
+func getEnvInt(key string, fallback int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+
+	var parsed int
+	_, err := fmt.Sscanf(val, "%d", &parsed)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func parseLogLevel(level string) slog.Level {

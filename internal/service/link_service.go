@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"time"
 
+	"github.com/ekideno/zaplink/internal/cache"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/repository"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,16 +18,18 @@ import (
 
 type LinkInfo struct {
 	Link        *model.Link
-	ClicksCount  int64
+	ClicksCount int64
 }
 
 type LinkService struct {
-	links  repository.LinkRepository
-	clicks repository.ClickRepository
+	links    repository.LinkRepository
+	cache    cache.LinkCache
+	clicks   repository.ClickRepository
+	cacheTTL time.Duration
 }
 
-func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepository) *LinkService {
-	return &LinkService{links: links, clicks: clicks}
+func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepository, linkCache cache.LinkCache, cacheTTL time.Duration) *LinkService {
+	return &LinkService{links: links, clicks: clicks, cache: linkCache, cacheTTL: cacheTTL}
 }
 
 func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*model.Link, error) {
@@ -61,6 +65,16 @@ func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*mode
 }
 
 func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*model.Link, error) {
+	if s.cache != nil {
+		link, err := s.cache.GetByShortCode(ctx, shortCode)
+		if err == nil && link != nil {
+			if !link.IsActive {
+				return nil, ErrInactiveLink
+			}
+			return link, nil
+		}
+	}
+
 	link, err := s.links.GetLinkByShortCode(ctx, shortCode)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -71,6 +85,10 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 
 	if !link.IsActive {
 		return nil, ErrInactiveLink
+	}
+
+	if s.cache != nil {
+		_ = s.cache.SetLink(ctx, link, s.cacheTTL)
 	}
 
 	return link, nil
@@ -88,7 +106,7 @@ func (s *LinkService) GetLinkInfo(ctx context.Context, shortCode string) (*LinkI
 	}
 
 	return &LinkInfo{
-		Link:       link,
+		Link:        link,
 		ClicksCount: clicksCount,
 	}, nil
 }
