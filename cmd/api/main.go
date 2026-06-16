@@ -17,6 +17,7 @@ import (
 	apphttp "github.com/ekideno/zaplink/internal/http"
 	"github.com/ekideno/zaplink/internal/http/handler"
 	"github.com/ekideno/zaplink/internal/logger"
+	"github.com/ekideno/zaplink/internal/metrics"
 	"github.com/ekideno/zaplink/internal/repository"
 	"github.com/ekideno/zaplink/internal/service"
 	"github.com/redis/go-redis/v9"
@@ -41,6 +42,7 @@ func run() error {
 		Env:      cfg.ENV,
 		LogLevel: cfg.Log.Level,
 	})
+	metrics.Register()
 
 	connectCtx, connectCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer connectCancel()

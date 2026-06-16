@@ -14,6 +14,7 @@ import (
 
 	"github.com/ekideno/zaplink/internal/apperror"
 	"github.com/ekideno/zaplink/internal/cache"
+	"github.com/ekideno/zaplink/internal/metrics"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/repository"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -62,6 +63,7 @@ func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*mode
 			return nil, fmt.Errorf("create link: %w", err)
 		}
 
+		metrics.LinksCreatedTotal.Inc()
 		return link, nil
 	}
 
@@ -143,6 +145,7 @@ func (s *LinkService) TrackClick(ctx context.Context, linkID int64, userAgent, r
 		return apperror.Wrap(err, http.StatusInternalServerError, "create_click", "create click")
 	}
 
+	metrics.ClicksTrackedTotal.Inc()
 	return nil
 }
 

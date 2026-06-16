@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ekideno/zaplink/internal/metrics"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -78,6 +79,7 @@ func (h *LinkHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 		writeError(h.log, w, r, err)
 		return
 	}
+	metrics.RedirectsTotal.Inc()
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
