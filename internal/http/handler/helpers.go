@@ -11,7 +11,9 @@ import (
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("json encode failed", slog.Int("status", status), slog.String("error", err.Error()))
+	}
 }
 
 func writeError(log *slog.Logger, w http.ResponseWriter, r *http.Request, err error) {
