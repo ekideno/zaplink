@@ -39,7 +39,7 @@ func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepo
 func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*model.Link, error) {
 	u, err := url.ParseRequestURI(originalURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, apperror.Wrapf(ErrInvalidURL, http.StatusBadRequest, "invalid_url", "must be http or https")
+		return nil, ErrInvalidURL
 	}
 
 	const maxRetries = 3
@@ -78,7 +78,7 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 			return link, nil
 		}
 		if err != nil && !errors.Is(err, cache.ErrCacheMiss) {
-			s.log.Error("cache get failed", slog.String("short_code", shortCode), slog.String("error", err.Error()))
+			s.log.Error("cache get failed", slog.String("short_code", shortCode), slog.Any("error", err))
 		}
 	}
 
@@ -96,7 +96,7 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 
 	if s.cache != nil {
 		if err := s.cache.SetLink(ctx, link, s.cacheTTL); err != nil {
-			s.log.Error("cache set failed", slog.String("short_code", shortCode), slog.String("error", err.Error()))
+			s.log.Error("cache set failed", slog.String("short_code", shortCode), slog.Any("error", err))
 		}
 	}
 

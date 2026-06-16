@@ -88,7 +88,7 @@ func (h *LinkHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 				slog.Int64("link_id", link.ID),
 				slog.String("user_agent", r.UserAgent()),
 				slog.String("remote_addr", r.RemoteAddr),
-				slog.String("error", err.Error()),
+				slog.Any("error", err),
 			)
 		}
 	}()
