@@ -52,14 +52,22 @@ func run() error {
 	defer database.Close()
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
+		Addr:         cfg.Redis.Addr,
+		Password:     cfg.Redis.Password,
+		DB:           cfg.Redis.DB,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
 	})
+
+	var linkCache cache.LinkCache
 	if err := redisClient.Ping(connectCtx).Err(); err != nil {
-		_ = redisClient.Close()
-		return fmt.Errorf("ping redis: %w", err)
+		log.Warn("redis unavailable, running without cache", slog.String("error", err.Error()))
+	} else {
+		linkCache = cache.NewRedisCache(redisClient)
+		log.Info("redis connected", slog.String("addr", cfg.Redis.Addr))
 	}
+
 	defer func() {
 		if err := redisClient.Close(); err != nil {
 			log.Error("close redis", slog.Any("error", err))
@@ -68,8 +76,7 @@ func run() error {
 
 	linkRepo := repository.NewLinkPostgres(database)
 	clickRepo := repository.NewClickPostgres(database)
-	linkCache := cache.NewRedisCache(redisClient)
-	linkService := service.NewLinkService(linkRepo, clickRepo, linkCache, cfg.Redis.TTL)
+	linkService := service.NewLinkService(linkRepo, clickRepo, linkCache, cfg.Redis.TTL, log)
 	linkHandler := handler.NewLinkHandler(linkService, log)
 
 	srv := &http.Server{

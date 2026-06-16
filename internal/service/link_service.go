@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,10 +29,11 @@ type LinkService struct {
 	cache    cache.LinkCache
 	clicks   repository.ClickRepository
 	cacheTTL time.Duration
+	log      *slog.Logger
 }
 
-func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepository, linkCache cache.LinkCache, cacheTTL time.Duration) *LinkService {
-	return &LinkService{links: links, clicks: clicks, cache: linkCache, cacheTTL: cacheTTL}
+func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepository, linkCache cache.LinkCache, cacheTTL time.Duration, log *slog.Logger) *LinkService {
+	return &LinkService{links: links, clicks: clicks, cache: linkCache, cacheTTL: cacheTTL, log: log}
 }
 
 func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*model.Link, error) {
@@ -75,6 +77,9 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 			}
 			return link, nil
 		}
+		if err != nil && !errors.Is(err, cache.ErrCacheMiss) {
+			s.log.Error("cache get failed", slog.String("short_code", shortCode), slog.String("error", err.Error()))
+		}
 	}
 
 	link, err := s.links.GetLinkByShortCode(ctx, shortCode)
@@ -90,7 +95,9 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 	}
 
 	if s.cache != nil {
-		_ = s.cache.SetLink(ctx, link, s.cacheTTL)
+		if err := s.cache.SetLink(ctx, link, s.cacheTTL); err != nil {
+			s.log.Error("cache set failed", slog.String("short_code", shortCode), slog.String("error", err.Error()))
+		}
 	}
 
 	return link, nil
