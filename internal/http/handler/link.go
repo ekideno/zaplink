@@ -80,7 +80,10 @@ func (h *LinkHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		if err := h.service.TrackClick(context.Background(), link.ID, r.UserAgent(), r.RemoteAddr); err != nil && h.log != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := h.service.TrackClick(ctx, link.ID, r.UserAgent(), r.RemoteAddr); err != nil && h.log != nil {
 			h.log.Error("track click failed",
 				slog.Int64("link_id", link.ID),
 				slog.String("user_agent", r.UserAgent()),
