@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/ekideno/zaplink/internal/apperror"
 	"github.com/ekideno/zaplink/internal/cache"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/repository"
@@ -35,7 +37,7 @@ func NewLinkService(links repository.LinkRepository, clicks repository.ClickRepo
 func (s *LinkService) CreateLink(ctx context.Context, originalURL string) (*model.Link, error) {
 	u, err := url.ParseRequestURI(originalURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, fmt.Errorf("%w: must be http or https", ErrInvalidURL)
+		return nil, apperror.Wrapf(ErrInvalidURL, http.StatusBadRequest, "invalid_url", "must be http or https")
 	}
 
 	const maxRetries = 3
@@ -78,9 +80,9 @@ func (s *LinkService) GetByShortCode(ctx context.Context, shortCode string) (*mo
 	link, err := s.links.GetLinkByShortCode(ctx, shortCode)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, repository.ErrNotFound
+			return nil, apperror.Wrap(err, http.StatusNotFound, "link_not_found", "link not found")
 		}
-		return nil, fmt.Errorf("get link by short code: %w", err)
+		return nil, apperror.Wrap(err, http.StatusInternalServerError, "get_link", "get link by short code")
 	}
 
 	if !link.IsActive {
@@ -102,7 +104,7 @@ func (s *LinkService) GetLinkInfo(ctx context.Context, shortCode string) (*LinkI
 
 	clicksCount, err := s.clicks.CountClicksByLinkID(ctx, link.ID)
 	if err != nil {
-		return nil, fmt.Errorf("count clicks: %w", err)
+		return nil, apperror.Wrap(err, http.StatusInternalServerError, "count_clicks", "count clicks")
 	}
 
 	return &LinkInfo{
@@ -131,7 +133,7 @@ func (s *LinkService) TrackClick(ctx context.Context, linkID int64, userAgent, r
 	}
 
 	if err := s.clicks.CreateClick(ctx, click); err != nil {
-		return fmt.Errorf("create click: %w", err)
+		return apperror.Wrap(err, http.StatusInternalServerError, "create_click", "create click")
 	}
 
 	return nil

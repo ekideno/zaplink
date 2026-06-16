@@ -3,13 +3,11 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/ekideno/zaplink/internal/model"
-	"github.com/ekideno/zaplink/internal/repository"
 	"github.com/ekideno/zaplink/internal/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -62,12 +60,7 @@ func (h *LinkHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 
 	link, err := h.service.CreateLink(r.Context(), req.URL)
 	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrInvalidURL):
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
-		}
+		writeError(h.log, w, r, err)
 		return
 	}
 
@@ -82,18 +75,20 @@ func (h *LinkHandler) Redirect(w http.ResponseWriter, r *http.Request) {
 
 	link, err := h.service.GetByShortCode(r.Context(), shortCode)
 	if err != nil {
-		switch {
-		case errors.Is(err, repository.ErrNotFound):
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "link not found"})
-		case errors.Is(err, service.ErrInactiveLink):
-			writeJSON(w, http.StatusGone, map[string]string{"error": "link is inactive"})
-		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
-		}
+		writeError(h.log, w, r, err)
 		return
 	}
 
-	go h.service.TrackClick(context.Background(), link.ID, r.UserAgent(), r.RemoteAddr)
+	go func() {
+		if err := h.service.TrackClick(context.Background(), link.ID, r.UserAgent(), r.RemoteAddr); err != nil && h.log != nil {
+			h.log.Error("track click failed",
+				slog.Int64("link_id", link.ID),
+				slog.String("user_agent", r.UserAgent()),
+				slog.String("remote_addr", r.RemoteAddr),
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
 
 	http.Redirect(w, r, link.OriginalURL, http.StatusFound)
 }
@@ -103,14 +98,7 @@ func (h *LinkHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
 
 	info, err := h.service.GetLinkInfo(r.Context(), shortCode)
 	if err != nil {
-		switch {
-		case errors.Is(err, repository.ErrNotFound):
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "link not found"})
-		case errors.Is(err, service.ErrInactiveLink):
-			writeJSON(w, http.StatusGone, map[string]string{"error": "link is inactive"})
-		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
-		}
+		writeError(h.log, w, r, err)
 		return
 	}
 

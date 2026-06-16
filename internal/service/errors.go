@@ -1,8 +1,12 @@
 package service
 
-import "errors"
+import (
+	"net/http"
+
+	"github.com/ekideno/zaplink/internal/apperror"
+)
 
 var (
-	ErrInvalidURL   = errors.New("invalid url")
-	ErrInactiveLink = errors.New("link is inactive")
+	ErrInvalidURL   = apperror.New(http.StatusBadRequest, "invalid_url", "invalid url")
+	ErrInactiveLink = apperror.New(http.StatusGone, "inactive_link", "link is inactive")
 )
