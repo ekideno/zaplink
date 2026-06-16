@@ -3,7 +3,9 @@ package service_test
 
 import (
 	"context"
+	"time"
 
+	"github.com/ekideno/zaplink/internal/cache"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/repository"
 )
@@ -18,6 +20,12 @@ type mockLinkRepo struct {
 type mockClickRepo struct {
 	createFn func(ctx context.Context, click *model.Click) error
 	countFn  func(ctx context.Context, linkID int64) (int64, error)
+}
+
+type mockLinkCache struct {
+	getByShortCodeFn func(ctx context.Context, shortCode string) (*model.Link, error)
+	setLinkFn        func(ctx context.Context, link *model.Link, ttl time.Duration) error
+	deleteFn         func(ctx context.Context, shortCode string) error
 }
 
 func (m *mockLinkRepo) CreateLink(ctx context.Context, link *model.Link) error {
@@ -60,4 +68,25 @@ func (m *mockClickRepo) CountClicksByLinkID(ctx context.Context, linkID int64) (
 		return m.countFn(ctx, linkID)
 	}
 	return 0, nil
+}
+
+func (m *mockLinkCache) GetByShortCode(ctx context.Context, shortCode string) (*model.Link, error) {
+	if m.getByShortCodeFn != nil {
+		return m.getByShortCodeFn(ctx, shortCode)
+	}
+	return nil, cache.ErrCacheMiss
+}
+
+func (m *mockLinkCache) SetLink(ctx context.Context, link *model.Link, ttl time.Duration) error {
+	if m.setLinkFn != nil {
+		return m.setLinkFn(ctx, link, ttl)
+	}
+	return nil
+}
+
+func (m *mockLinkCache) DeleteByShortCode(ctx context.Context, shortCode string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, shortCode)
+	}
+	return nil
 }

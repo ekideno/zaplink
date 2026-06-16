@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/ekideno/zaplink/internal/apperror"
+	"github.com/ekideno/zaplink/internal/cache"
 	"github.com/ekideno/zaplink/internal/model"
 	"github.com/ekideno/zaplink/internal/repository"
 	"github.com/ekideno/zaplink/internal/service"
@@ -233,5 +235,135 @@ func TestCreateLink_SetsActiveFlag(t *testing.T) {
 	}
 	if got == nil || !got.IsActive {
 		t.Fatal("expected created link to be active")
+	}
+}
+
+func TestCreateLink_RepoErrorWrapped(t *testing.T) {
+	repo := &mockLinkRepo{
+		createFn: func(ctx context.Context, link *model.Link) error {
+			return errors.New("insert failed")
+		},
+	}
+
+	svc := service.NewLinkService(repo, &mockClickRepo{}, nil, 0, slog.Default())
+	_, err := svc.CreateLink(context.Background(), "https://example.com")
+
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got := err.Error(); got != "create link: insert failed" {
+		t.Fatalf("expected wrapped error, got %q", got)
+	}
+}
+
+func TestGetByShortCode_CacheHit(t *testing.T) {
+	cacheHit := &mockLinkCache{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return &model.Link{ID: 1, ShortCode: shortCode, OriginalURL: "https://cached.example.com", IsActive: true}, nil
+		},
+	}
+	repo := &mockLinkRepo{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			t.Fatal("repo should not be called on cache hit")
+			return nil, nil
+		},
+	}
+
+	svc := service.NewLinkService(repo, &mockClickRepo{}, cacheHit, time.Minute, slog.Default())
+	link, err := svc.GetByShortCode(context.Background(), "abc123")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if link.OriginalURL != "https://cached.example.com" {
+		t.Fatalf("expected cached link, got %q", link.OriginalURL)
+	}
+}
+
+func TestGetByShortCode_CacheMissFallsBackToRepoAndWarmsCache(t *testing.T) {
+	var setCalled bool
+	cacheMiss := &mockLinkCache{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return nil, cache.ErrCacheMiss
+		},
+		setLinkFn: func(ctx context.Context, link *model.Link, ttl time.Duration) error {
+			setCalled = true
+			if ttl != 2*time.Minute {
+				t.Fatalf("expected ttl 2m, got %s", ttl)
+			}
+			if link.ShortCode != "abc123" {
+				t.Fatalf("expected cached short code abc123, got %s", link.ShortCode)
+			}
+			return nil
+		},
+	}
+	repo := &mockLinkRepo{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return &model.Link{ID: 7, ShortCode: shortCode, OriginalURL: "https://repo.example.com", IsActive: true}, nil
+		},
+	}
+
+	svc := service.NewLinkService(repo, &mockClickRepo{}, cacheMiss, 2*time.Minute, slog.Default())
+	link, err := svc.GetByShortCode(context.Background(), "abc123")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if link.OriginalURL != "https://repo.example.com" {
+		t.Fatalf("expected repo link, got %q", link.OriginalURL)
+	}
+	if !setCalled {
+		t.Fatal("expected cache set to be called")
+	}
+}
+
+func TestGetByShortCode_CacheErrorStillFallsBack(t *testing.T) {
+	cacheLayer := &mockLinkCache{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return nil, errors.New("redis unavailable")
+		},
+	}
+	repo := &mockLinkRepo{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return &model.Link{ID: 7, ShortCode: shortCode, OriginalURL: "https://repo.example.com", IsActive: true}, nil
+		},
+	}
+
+	svc := service.NewLinkService(repo, &mockClickRepo{}, cacheLayer, time.Minute, slog.Default())
+	link, err := svc.GetByShortCode(context.Background(), "abc123")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if link.ShortCode != "abc123" {
+		t.Fatalf("expected short code abc123, got %s", link.ShortCode)
+	}
+}
+
+func TestGetByShortCode_CacheInactiveLink(t *testing.T) {
+	cacheLayer := &mockLinkCache{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return &model.Link{ShortCode: shortCode, IsActive: false}, nil
+		},
+	}
+
+	svc := service.NewLinkService(&mockLinkRepo{}, &mockClickRepo{}, cacheLayer, time.Minute, slog.Default())
+	_, err := svc.GetByShortCode(context.Background(), "abc123")
+	if !errors.Is(err, service.ErrInactiveLink) {
+		t.Fatalf("expected ErrInactiveLink, got %v", err)
+	}
+}
+
+func TestGetByShortCode_RepoTechnicalErrorWrapped(t *testing.T) {
+	repo := &mockLinkRepo{
+		getByShortCodeFn: func(ctx context.Context, shortCode string) (*model.Link, error) {
+			return nil, errors.New("db down")
+		},
+	}
+
+	svc := service.NewLinkService(repo, &mockClickRepo{}, nil, 0, slog.Default())
+	_, err := svc.GetByShortCode(context.Background(), "abc123")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if apperror.Status(err) != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", apperror.Status(err))
 	}
 }
