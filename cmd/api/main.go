@@ -37,19 +37,10 @@ func run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	log, closeLog, err := logger.New(logger.Config{
+	log := logger.New(logger.Config{
 		Env:      cfg.ENV,
-		LogFile:  cfg.Log.File,
 		LogLevel: cfg.Log.Level,
 	})
-	if err != nil {
-		return fmt.Errorf("init logger: %w", err)
-	}
-	defer func() {
-		if err := closeLog(); err != nil {
-			log.Error("close logger", slog.Any("error", err))
-		}
-	}()
 
 	connectCtx, connectCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer connectCancel()

@@ -33,7 +33,6 @@ type RedisConfig struct {
 
 type LogConfig struct {
 	Level slog.Level
-	File  string
 }
 
 func Load() (Config, error) {
@@ -55,7 +54,6 @@ func Load() (Config, error) {
 
 		Log: LogConfig{
 			Level: parseLogLevel(getEnv("LOG_LEVEL", "info")),
-			File:  getEnv("LOG_FILE", "./logs/app.log"),
 		},
 	}
 
