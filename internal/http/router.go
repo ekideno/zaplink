@@ -13,7 +13,7 @@ import (
 	appmiddleware "github.com/ekideno/zaplink/internal/middleware"
 )
 
-func NewRouter(log *slog.Logger, linkHandler *handler.LinkHandler) http.Handler {
+func NewRouter(log *slog.Logger, linkHandler *handler.LinkHandler, healthHandler *handler.HealthHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -24,9 +24,7 @@ func NewRouter(log *slog.Logger, linkHandler *handler.LinkHandler) http.Handler 
 
 	r.Mount("/metrics", promhttp.Handler())
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	})
+	r.Get("/health", healthHandler.Health)
 
 	r.Post("/links", linkHandler.CreateLink)
 	r.Get("/links/{short_code}", linkHandler.GetInfo)

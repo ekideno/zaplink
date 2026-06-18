@@ -63,6 +63,10 @@ func (c *RedisCache) DeleteByShortCode(ctx context.Context, shortCode string) er
 	return nil
 }
 
+func (c *RedisCache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}
+
 func (c *RedisCache) key(shortCode string) string {
 	return c.prefix + shortCode
 }

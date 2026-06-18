@@ -88,3 +88,7 @@ func (r *LinkPostgresRepository) UpdateLink(ctx context.Context, link *model.Lin
 
 	return nil
 }
+
+func (r *LinkPostgresRepository) Ping(ctx context.Context) error {
+	return r.db.Pool.Ping(ctx)
+}

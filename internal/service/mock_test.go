@@ -56,6 +56,10 @@ func (m *mockLinkRepo) UpdateLink(ctx context.Context, link *model.Link) error {
 	return nil
 }
 
+func (m *mockLinkRepo) Ping(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockClickRepo) CreateClick(ctx context.Context, click *model.Click) error {
 	if m.createFn != nil {
 		return m.createFn(ctx, click)
@@ -88,5 +92,9 @@ func (m *mockLinkCache) DeleteByShortCode(ctx context.Context, shortCode string)
 	if m.deleteFn != nil {
 		return m.deleteFn(ctx, shortCode)
 	}
+	return nil
+}
+
+func (m *mockLinkCache) Ping(ctx context.Context) error {
 	return nil
 }

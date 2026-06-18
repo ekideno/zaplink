@@ -80,10 +80,11 @@ func run() error {
 	clickRepo := repository.NewClickPostgres(database)
 	linkService := service.NewLinkService(linkRepo, clickRepo, linkCache, cfg.Redis.TTL, log)
 	linkHandler := handler.NewLinkHandler(linkService, log)
+	healthHandler := handler.NewHealthHandler(log, linkRepo, linkCache)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
-		Handler:      apphttp.NewRouter(log, linkHandler),
+		Handler:      apphttp.NewRouter(log, linkHandler, healthHandler),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

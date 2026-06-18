@@ -14,6 +14,7 @@ type LinkRepository interface {
 	GetLinkByID(ctx context.Context, id int64) (*model.Link, error)
 	GetLinkByShortCode(ctx context.Context, shortCode string) (*model.Link, error)
 	UpdateLink(ctx context.Context, link *model.Link) error
+	Ping(ctx context.Context) error
 }
 
 type ClickRepository interface {
