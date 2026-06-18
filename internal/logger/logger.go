@@ -24,7 +24,10 @@ func New(cfg Config) *slog.Logger {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 
-	logger := slog.New(handler)
+	logger := slog.New(handler).With(
+		slog.String("service", "zaplink"),
+		slog.String("env", cfg.Env),
+	)
 	slog.SetDefault(logger)
 
 	return logger
