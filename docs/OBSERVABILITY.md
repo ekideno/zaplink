@@ -32,34 +32,7 @@ ZapLink includes a **full observability stack** for monitoring application healt
 
 **Stack Architecture:**
 
-```
-┌─────────────┐
-│  ZapLink    │ (Go app on :8080)
-│   App       │
-└──┬────────┬─┘
-   │        │
-   │ /metrics │ stdout logs
-   │        │
-   ▼        ▼
-┌──────┐  ┌───────────┐
-│Prome-│  │ Promtail  │ (Docker log collector)
-│theus │  └─────┬─────┘
-│:9090 │        │
-└──┬───┘        │
-   │            ▼
-   │       ┌────────┐
-   │       │  Loki  │ (Log aggregation)
-   │       │ :3100  │
-   │       └────┬───┘
-   │            │
-   └────────────┼─────────┐
-                │         │
-                ▼         ▼
-           ┌──────────────────┐
-           │     Grafana      │ (Visualization)
-           │      :3000       │
-           └──────────────────┘
-```
+![Stack Architecture](docs/images/stack_architecture.png)
 
 ---
 
