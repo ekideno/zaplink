@@ -39,42 +39,7 @@ ZapLink is a **high-performance URL shortener** built with Go, designed to handl
 
 ZapLink follows a **layered architecture** pattern with clear separation of concerns:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     HTTP Layer                          │
-│  ┌────────────┐  ┌────────────┐  ┌─────────────────┐   │
-│  │  Handler   │  │ Middleware │  │     Router      │   │
-│  │ (chi.Mux)  │  │ (logging,  │  │  (endpoints)    │   │
-│  │            │  │  metrics,  │  │                 │   │
-│  │            │  │  recovery) │  │                 │   │
-│  └─────┬──────┘  └────────────┘  └─────────────────┘   │
-└────────┼──────────────────────────────────────────────┘
-         │
-┌────────▼──────────────────────────────────────────────┐
-│                   Service Layer                        │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │  • Business logic                                │ │
-│  │  • Short code generation (base62)                │ │
-│  │  • URL validation                                │ │
-│  │  • Cache + Repository orchestration              │ │
-│  │  • Click tracking coordination                   │ │
-│  └──────────────────────────────────────────────────┘ │
-└────────┬────────────────────────┬─────────────────────┘
-         │                        │
-┌────────▼──────────┐    ┌────────▼─────────────┐
-│  Repository Layer │    │    Cache Layer       │
-│                   │    │                      │
-│  • PostgreSQL     │    │  • Redis             │
-│  • CRUD ops       │    │  • Get/Set/Delete    │
-│  • Transactions   │    │  • TTL: 1 hour       │
-│  • Migrations     │    │  • Graceful degrade  │
-└───────────────────┘    └──────────────────────┘
-         │                        │
-┌────────▼──────────┐    ┌────────▼─────────────┐
-│   PostgreSQL      │    │      Redis           │
-│   Database        │    │      Cache           │
-└───────────────────┘    └──────────────────────┘
-```
+![System Architecture](docs/images/system_architecture.png)
 
 ### Layer Responsibilities
 
@@ -205,24 +170,7 @@ CREATE INDEX idx_clicks_created_at ON clicks(created_at DESC);
 
 ### 1. Create Short Link
 
-```
-Client                Handler              Service              Repository           PostgreSQL
-  │                      │                    │                      │                    │
-  ├─POST /links────────>│                    │                      │                    │
-  │ {"url":"..."}        │                    │                      │                    │
-  │                      ├─Validate JSON────>│                      │                    │
-  │                      │                    ├─Validate URL        │                    │
-  │                      │                    ├─Generate short_code │                    │
-  │                      │                    │  (base62, 7 chars)  │                    │
-  │                      │                    │                      │                    │
-  │                      │                    ├─CreateLink()───────>│                    │
-  │                      │                    │                      ├─INSERT INTO links─>│
-  │                      │                    │                      │<─link_id───────────┤
-  │                      │                    │<─link─────────────────┤                   │
-  │                      │<─short_code, url───┤                      │                    │
-  │<─201 Created─────────┤                    │                      │                    │
-  │ {"short_code":"abc"} │                    │                      │                    │
-```
+![Create Short Link](docs/images/create_short_link.png)
 
 **Key Steps:**
 1. Handler validates request body (JSON unmarshaling)
@@ -237,25 +185,7 @@ Client                Handler              Service              Repository      
 
 ### 2. Redirect (Hot Path)
 
-```
-Client           Handler         Service         Cache(Redis)     Repository      PostgreSQL
-  │                 │               │                 │                │                │
-  ├─GET /abc──────>│               │                 │                │                │
-  │                 ├─Extract code─>│                 │                │                │
-  │                 │               ├─GetByShortCode()│                │                │
-  │                 │               │                 │                │                │
-  │                 │               ├─GET short_code─>│                │                │
-  │                 │               │<─HIT: link_json─┤                │                │
-  │                 │               │ (< 1ms)         │                │                │
-  │                 │<─original_url─┤                 │                │                │
-  │<─302 Redirect───┤               │                 │                │                │
-  │ Location: https://...           │                 │                │                │
-  │                 │               │                 │                │                │
-  │                 ├─[goroutine]───────────────────────────────────>│                │
-  │                 │  TrackClick(short_code, user_agent, ip)         │                │
-  │                 │               │                 │                ├─INSERT click──>│
-  │                 │               │                 │                │                │
-```
+![Redirect](docs/images/redirect.png)
 
 **Cache Hit (95% of requests):**
 1. Handler extracts `short_code` from URL path
@@ -298,21 +228,7 @@ Client           Handler         Service         Cache(Redis)     Repository    
 
 ### 3. Get Link Info
 
-```
-Client           Handler         Service         Repository      PostgreSQL
-  │                 │               │                 │                │
-  ├─GET /links/abc─>│               │                 │                │
-  │                 ├─Extract code─>│                 │                │
-  │                 │               ├─GetByShortCode()───────────────>│
-  │                 │               │                 ├─SELECT * ─────>│
-  │                 │               │                 ├─SELECT COUNT(*) FROM clicks
-  │                 │               │                 │  WHERE link_id=?
-  │                 │               │                 │<─link + count──┤
-  │                 │               │<─link, count──────────────────────┤
-  │                 │<─link_dto─────┤                 │                │
-  │<─200 OK─────────┤               │                 │                │
-  │ {"id":42, "click_count":127}    │                 │                │
-```
+![Get Link Info](docs/images/get_link_info.png)
 
 **Key Points:**
 - Does NOT use cache (always fresh data from PostgreSQL)

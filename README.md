@@ -54,26 +54,7 @@ curl -I http://localhost:8080/abc123
 
 ### 🏗️ Architecture
 
-```
-┌─────────────┐
-│   Client    │
-└──────┬──────┘
-       │
-┌──────▼──────────────────────────────────────┐
-│           HTTP Handler Layer                │
-│  (validation, JSON marshaling, routing)     │
-└──────┬──────────────────────────────────────┘
-       │
-┌──────▼──────────────────────────────────────┐
-│           Service Layer                     │
-│  (business logic, short code generation)    │
-└──────┬──────────────────┬───────────────────┘
-       │                  │
-┌──────▼──────┐    ┌──────▼──────┐
-│  PostgreSQL │    │    Redis    │
-│ (persistent)│    │   (cache)   │
-└─────────────┘    └─────────────┘
-```
+![Architecture](docs/images/architecture.png)
 
 **Key Design Decisions:**
 - Repository layer does NOT handle caching (service orchestrates both)
