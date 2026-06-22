@@ -32,7 +32,7 @@ ZapLink включает **полный стек наблюдаемости** д
 
 **Архитектура стека:**
 
-![Архитектура стека](docs/images/stack_architecture.png)
+![Архитектура стека](images/stack_architecture.png)
 
 ---
 

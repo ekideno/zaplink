@@ -39,7 +39,7 @@ ZapLink — это **высокопроизводительный сервис �
 
 ZapLink следует паттерну **слоёной архитектуры** с чётким разделением ответственности:
 
-![Системная архитектура](docs/images/system_architecture.png)
+![Системная архитектура](images/system_architecture.png)
 
 ### Ответственность слоёв
 
@@ -170,7 +170,7 @@ CREATE INDEX idx_clicks_created_at ON clicks(created_at DESC);
 
 ### 1. Создание короткой ссылки
 
-![Создание короткой ссылки](docs/images/create_short_link.png)
+![Создание короткой ссылки](images/create_short_link.png)
 
 **Ключевые шаги:**
 1. Handler валидирует тело запроса (JSON unmarshaling)
@@ -185,7 +185,7 @@ CREATE INDEX idx_clicks_created_at ON clicks(created_at DESC);
 
 ### 2. Редирект (горячий путь)
 
-![Редирект](docs/images/redirect.png)
+![Редирект](images/redirect.png)
 
 **Cache Hit (95% запросов):**
 1. Handler извлекает `short_code` из URL path

@@ -32,7 +32,7 @@ ZapLink includes a **full observability stack** for monitoring application healt
 
 **Stack Architecture:**
 
-![Stack Architecture](docs/images/stack_architecture.png)
+![Stack Architecture](images/stack_architecture.png)
 
 ---
 

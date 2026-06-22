@@ -39,7 +39,7 @@ ZapLink is a **high-performance URL shortener** built with Go, designed to handl
 
 ZapLink follows a **layered architecture** pattern with clear separation of concerns:
 
-![System Architecture](docs/images/system_architecture.png)
+![System Architecture](images/system_architecture.png)
 
 ### Layer Responsibilities
 
@@ -170,7 +170,7 @@ CREATE INDEX idx_clicks_created_at ON clicks(created_at DESC);
 
 ### 1. Create Short Link
 
-![Create Short Link](docs/images/create_short_link.png)
+![Create Short Link](images/create_short_link.png)
 
 **Key Steps:**
 1. Handler validates request body (JSON unmarshaling)
@@ -185,7 +185,7 @@ CREATE INDEX idx_clicks_created_at ON clicks(created_at DESC);
 
 ### 2. Redirect (Hot Path)
 
-![Redirect](docs/images/redirect.png)
+![Redirect](images/redirect.png)
 
 **Cache Hit (95% of requests):**
 1. Handler extracts `short_code` from URL path
@@ -228,7 +228,7 @@ CREATE INDEX idx_clicks_created_at ON clicks(created_at DESC);
 
 ### 3. Get Link Info
 
-![Get Link Info](docs/images/get_link_info.png)
+![Get Link Info](images/get_link_info.png)
 
 **Key Points:**
 - Does NOT use cache (always fresh data from PostgreSQL)
